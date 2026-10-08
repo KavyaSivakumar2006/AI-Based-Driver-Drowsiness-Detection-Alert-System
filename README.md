@@ -52,3 +52,25 @@ Eye Analysis   Yawning        Head Pose
     NORMAL           DROWSY
                        ↓
                   🚨 ALERT
+
+ ->Key Concepts:
+
+(*)Eye Analysis
+The system analyzes the driver's eyes to identify:
+- Eye opening and closing
+- Blink patterns
+- Prolonged eye closure
+Eye-related measurements such as the Eye Aspect Ratio (EAR) will be used to analyze eye closure.
+(*)Yawning Detection
+The system analyzes mouth movement and opening patterns to identify possible yawning behavior.
+(*) Facial Landmark Analysis
+Facial landmarks are used to locate important facial regions such as:
+- Eyes
+- Nose
+- Mouth
+- Face outline
+These landmarks provide the measurements required for further analysis.
+
+->Temporal Analysis
+A single frame is not enough to determine drowsiness.
+The system analyzes driver behavior across multiple video frames to distinguish normal actions such as blinking from prolonged or repeated signs of drowsiness.
