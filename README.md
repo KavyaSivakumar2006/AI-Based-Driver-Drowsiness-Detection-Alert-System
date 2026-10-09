@@ -74,3 +74,40 @@ These landmarks provide the measurements required for further analysis.
 ->Temporal Analysis
 A single frame is not enough to determine drowsiness.
 The system analyzes driver behavior across multiple video frames to distinguish normal actions such as blinking from prolonged or repeated signs of drowsiness.
+
+-> Drowsiness Analysis
+Multiple visual indicators can be combined to estimate the driver's drowsiness level.
+Potential indicators include:
+- Eye closure duration
+- Blink behavior
+- Yawning
+- Head position
+- Repeated drowsiness patterns
+
+->Alert System
+When the system identifies significant signs of drowsiness, it will generate a warning to alert the driver.
+
+->Technologies
+- Python
+- OpenCV
+- Computer Vision
+- Facial Landmark Detection
+- Real-Time Video Processing
+
+Initial Project Structure
+ai-driver-drowsiness-detection/
+│
+├── src/
+│   └── camera_test.py
+│
+├── README.md
+├── requirements.txt
+└── .gitignore
+
+->Future Scope
+- Driver-specific calibration
+- Low-light performance improvement
+- Mobile or embedded deployment
+- Real-time dashboard
+- Event logging and analytics
+- Integration with vehicle safety systems
