@@ -3,6 +3,7 @@ import cv2
 import mediapipe as mp
 import math
 import time
+import winsound
 
 # Six landmark points around each eye
 LEFT_EYE = [362, 385, 387, 263, 373, 380]
@@ -12,10 +13,8 @@ RIGHT_EYE = [33, 160, 158, 133, 153, 144]
 EAR_THRESHOLD = 0.22
 CLOSED_EYE_SECONDS = 1.5
 
-
+# Calculate Eye Aspect Ratio
 def calculate_ear(eye_points):
-    """Calculate the Eye Aspect Ratio (EAR)."""
-
     def distance(point_a, point_b):
         return math.dist(point_a, point_b)
 
@@ -29,6 +28,11 @@ def calculate_ear(eye_points):
     return (vertical_1 + vertical_2) / (2.0 * horizontal)
 
 
+def stop_alarm():
+    """Stop the repeating Windows sound."""
+    winsound.PlaySound(None, 0)
+
+
 def main():
     camera = cv2.VideoCapture(0)
 
@@ -38,101 +42,138 @@ def main():
 
     mp_face_mesh = mp.solutions.face_mesh
     eyes_closed_since = None
+    alarm_playing = False
 
-    with mp_face_mesh.FaceMesh(
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    ) as face_mesh:
+    try:
+        with mp_face_mesh.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        ) as face_mesh:
 
-        print("Drowsiness detection started.")
-        print("Press Q to quit.")
+            print("Drowsiness detection with sound alert started.")
+            print("Press Q to quit.")
 
-        while True:
-            success, frame = camera.read()
+            while True:
+                success, frame = camera.read()
 
-            if not success:
-                print("Error: Could not read webcam frame.")
-                break
+                if not success:
+                    print("Error: Could not read webcam frame.")
+                    break
 
-            frame = cv2.flip(frame, 1)
-            height, width, _ = frame.shape
+                frame = cv2.flip(frame, 1)
+                height, width, _ = frame.shape
 
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = face_mesh.process(rgb_frame)
+                rgb_frame = cv2.cvtColor(
+                    frame, cv2.COLOR_BGR2RGB
+                )
+                results = face_mesh.process(rgb_frame)
 
-            status = "Face not detected"
-            color = (0, 0, 255)
+                status = "Face not detected"
+                color = (0, 0, 255)
 
-            if results.multi_face_landmarks:
-                face = results.multi_face_landmarks[0]
-                ear_values = []
+                if results.multi_face_landmarks:
+                    face = results.multi_face_landmarks[0]
+                    ear_values = []
 
-                for eye_indices in [LEFT_EYE, RIGHT_EYE]:
-                    points = []
+                    # Calculate EAR for both eyes
+                    for eye_indices in [LEFT_EYE, RIGHT_EYE]:
+                        points = []
 
-                    for index in eye_indices:
-                        landmark = face.landmark[index]
-                        x = int(landmark.x * width)
-                        y = int(landmark.y * height)
-                        points.append((x, y))
+                        for index in eye_indices:
+                            landmark = face.landmark[index]
+                            x = int(landmark.x * width)
+                            y = int(landmark.y * height)
+                            points.append((x, y))
 
-                    ear = calculate_ear(points)
-                    ear_values.append(ear)
+                        ear_values.append(calculate_ear(points))
 
-                    # Display eye landmarks
-                    for point in points:
-                        cv2.circle(frame, point, 2, (0, 255, 0), -1)
+                        # Draw eye landmark points
+                        for point in points:
+                            cv2.circle(
+                                frame, point, 2, (0, 255, 0), -1
+                            )
 
-                average_ear = sum(ear_values) / len(ear_values)
+                    average_ear = sum(ear_values) / len(ear_values)
+
+                    cv2.putText(
+                        frame,
+                        f"EAR: {average_ear:.3f}",
+                        (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.8,
+                        (255, 255, 0),
+                        2
+                    )
+
+                    current_time = time.time()
+
+                    if average_ear < EAR_THRESHOLD:
+                        if eyes_closed_since is None:
+                            eyes_closed_since = current_time
+
+                        closed_duration = (
+                            current_time - eyes_closed_since
+                        )
+
+                        if closed_duration >= CLOSED_EYE_SECONDS:
+                            status = "DROWSINESS WARNING!"
+                            color = (0, 0, 255)
+
+                            # Start the repeating alarm once
+                            if not alarm_playing:
+                                winsound.PlaySound(
+                                    "SystemExclamation",
+                                    winsound.SND_ALIAS
+                                    | winsound.SND_ASYNC
+                                    | winsound.SND_LOOP
+                                )
+                                alarm_playing = True
+                        else:
+                            status = "Eyes closed"
+                            color = (0, 165, 255)
+
+                    else:
+                        eyes_closed_since = None
+                        status = "Awake"
+                        color = (0, 255, 0)
+
+                        # Stop the alarm when eyes reopen
+                        if alarm_playing:
+                            stop_alarm()
+                            alarm_playing = False
+
+                else:
+                    # Reset if the face is not detected
+                    eyes_closed_since = None
+
+                    if alarm_playing:
+                        stop_alarm()
+                        alarm_playing = False
 
                 cv2.putText(
                     frame,
-                    f"EAR: {average_ear:.3f}",
-                    (20, 40),
+                    status,
+                    (20, 80),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.8,
-                    (255, 255, 0),
+                    color,
                     2
                 )
 
-                current_time = time.time()
+                cv2.imshow("Drowsiness Detection", frame)
 
-                if average_ear < EAR_THRESHOLD:
-                    if eyes_closed_since is None:
-                        eyes_closed_since = current_time
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
 
-                    closed_duration = current_time - eyes_closed_since
+    finally:
+        # Clean up the alarm, webcam and windows
+        if alarm_playing:
+            stop_alarm()
 
-                    if closed_duration >= CLOSED_EYE_SECONDS:
-                        status = "DROWSINESS WARNING!"
-                        color = (0, 0, 255)
-                    else:
-                        status = "Eyes closed"
-                        color = (0, 165, 255)
-                else:
-                    eyes_closed_since = None
-                    status = "Awake"
-                    color = (0, 255, 0)
-
-            cv2.putText(
-                frame,
-                status,
-                (20, 80),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                color,
-                2
-            )
-
-            cv2.imshow("Drowsiness Detection", frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-
-    camera.release()
-    cv2.destroyAllWindows()
+        camera.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
