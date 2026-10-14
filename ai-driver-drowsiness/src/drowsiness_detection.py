@@ -4,7 +4,7 @@ import math
 import time
 import winsound
 
-# Six landmark points around each eye
+# Eye landmark indices
 LEFT_EYE = [362, 385, 387, 263, 373, 380]
 RIGHT_EYE = [33, 160, 158, 133, 153, 144]
 
@@ -12,8 +12,10 @@ RIGHT_EYE = [33, 160, 158, 133, 153, 144]
 EAR_THRESHOLD = 0.22
 CLOSED_EYE_SECONDS = 1.5
 
-# Calculate Eye Aspect Ratio
+
 def calculate_ear(eye_points):
+    """Calculate Eye Aspect Ratio."""
+
     def distance(point_a, point_b):
         return math.dist(point_a, point_b)
 
@@ -28,7 +30,7 @@ def calculate_ear(eye_points):
 
 
 def stop_alarm():
-    """Stop the repeating Windows sound."""
+    """Stop the repeating Windows alarm."""
     winsound.PlaySound(None, 0)
 
 
@@ -40,6 +42,7 @@ def main():
         return
 
     mp_face_mesh = mp.solutions.face_mesh
+
     eyes_closed_since = None
     alarm_playing = False
 
@@ -51,7 +54,7 @@ def main():
             min_tracking_confidence=0.5
         ) as face_mesh:
 
-            print("Drowsiness detection with sound alert started.")
+            print("Drowsiness detection started.")
             print("Press Q to quit.")
 
             while True:
@@ -71,12 +74,13 @@ def main():
 
                 status = "Face not detected"
                 color = (0, 0, 255)
+                closed_duration = 0.0
 
                 if results.multi_face_landmarks:
                     face = results.multi_face_landmarks[0]
                     ear_values = []
 
-                    # Calculate EAR for both eyes
+                    # Detect both eyes and calculate EAR
                     for eye_indices in [LEFT_EYE, RIGHT_EYE]:
                         points = []
 
@@ -88,7 +92,6 @@ def main():
 
                         ear_values.append(calculate_ear(points))
 
-                        # Draw eye landmark points
                         for point in points:
                             cv2.circle(
                                 frame, point, 2, (0, 255, 0), -1
@@ -101,7 +104,7 @@ def main():
                         f"EAR: {average_ear:.3f}",
                         (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8,
+                        0.7,
                         (255, 255, 0),
                         2
                     )
@@ -120,7 +123,6 @@ def main():
                             status = "DROWSINESS WARNING!"
                             color = (0, 0, 255)
 
-                            # Start the repeating alarm once
                             if not alarm_playing:
                                 winsound.PlaySound(
                                     "SystemExclamation",
@@ -135,22 +137,34 @@ def main():
 
                     else:
                         eyes_closed_since = None
+                        closed_duration = 0.0
                         status = "Awake"
                         color = (0, 255, 0)
 
-                        # Stop the alarm when eyes reopen
                         if alarm_playing:
                             stop_alarm()
                             alarm_playing = False
 
+                    # Display live eye-closure duration
+                    cv2.putText(
+                        frame,
+                        f"Eyes closed: {closed_duration:.1f} s",
+                        (20, 120),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        color,
+                        2
+                    )
+
                 else:
-                    # Reset if the face is not detected
+                    # Reset timer and alarm if face disappears
                     eyes_closed_since = None
 
                     if alarm_playing:
                         stop_alarm()
                         alarm_playing = False
 
+                # Display detection status
                 cv2.putText(
                     frame,
                     status,
@@ -167,7 +181,6 @@ def main():
                     break
 
     finally:
-        # Clean up the alarm, webcam and windows
         if alarm_playing:
             stop_alarm()
 
